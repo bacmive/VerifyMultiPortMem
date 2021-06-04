@@ -1,0 +1,28 @@
+    fseq
+    let v1 = get_trace_val ckt "Memory.mem<5><0>" 3 in
+    let v2 = get_trace_val ckt "Memory.mem<5><1>" 3 in
+    let v3 = get_trace_val ckt "Memory.mem<5><2>" 3 in
+    let v4 = get_trace_val ckt "Memory_1.mem<5><0>" 3 in
+    let v5 = get_trace_val ckt "Memory_1.mem<5><1>" 3 in
+    let v6 = get_trace_val ckt "Memory_1.mem<5><2>" 3 in
+    val (v1a, v1b) = v1 in
+    val (v2a, v2b) = v2 in
+    val (v3a, v3b) = v3 in
+    val (v4a, v4b) = v4 in
+    val (v5a, v5b) = v5 in
+    val (v6a, v6b) = v6 in
+    fprintf stdout "
+Memory.mem<5><0>=(%B,%B)
+Memory.mem<5><1>=(%B,%B) 
+Memory.mem<5><2>=(%B,%B) 
+Memory_1.mem<5><0>=(%B,%B) 
+Memory_1.mem<5><2>=(%B,%B) 
+Memory_1.mem<5><3>=(%B,%B) 
+" (
+v1a, v1b, 
+v2a, v2b,
+v3a, v3b,
+v4a, v4b,
+v5a, v5b,
+v6a, v6b
+)

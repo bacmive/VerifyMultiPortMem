@@ -1,0 +1,205 @@
+let ckt = load_exe "LVTMultiPortRams16.exe";
+load "gsteSymReduce.fl";
+loadModel ckt;
+
+let isI addrV i=
+    let ADDR_SIZE = length addrV in 
+    let ivec = ind2Addr i ADDR_SIZE in
+    let terms = map2 (\a. \iv. iv=bT =>  a | bNOT a) addrV ivec in
+    itlist (\t.\pre. (t bAND pre)) terms bT
+;
+
+let addrIs adr n= 
+    let size = length adr 
+    in
+	letrec tobool n size=
+		(size = 0) => []
+		| (n%2): (tobool (n/2) (size-1)) 
+    in
+	TAndList (map2 (\i.\j. (i=0) => (Is0 (el (j+1) adr)) | (Is1 (el (j+1) adr))) (tobool n size) (0 upto (size-1)))
+;
+
+//universal STE
+let uSTE option model weak ant cons trace_list constraints =
+    constraints = [] => (
+       STE option model weak ant cons trace_list
+    ) | (
+        let all_cnstr = itlist (\c.\pre. c bAND pre) constraints bT in
+        let cnstr_bdd = hd (bexpr2bdd [] [all_cnstr]) in
+        cSTE ([], [cnstr_bdd]) option model weak ant cons trace_list
+    )
+;
+
+//log_2 function, ceiling 
+let log2 n = 
+    let res = ref 1 in
+    letrec helper n = 
+        (2**(deref res) >= n) => (deref res)
+        | res := (deref res) + 1 fseq helper n
+    in
+    helper n
+;
+
+let m = 2;      //write port number
+let n = 2;      //read port number
+let addr = 4;   //address size
+let depth = 2**addr; //memory depth
+let width=8;    //data size
+let lvtLen = log2 m;
+
+//memory definition
+//k: k-th read port(0<= k < m)
+//i: i-th block of n read-mem-blocks(0<= i < n)
+//adr: read address
+//m: total write port number
+//n: total read port number
+//width: data size
+let Memory k i adr m n width= map (\j. "Memory" ^ ((k*n+i=0) => "" | ("_"^(int2str (k*n+i))))
+                                        ^".mem<" ^ (int2str adr) ^ "><" ^ (int2str j) ^ ">") (0 upto (width-1));
+
+//live value table definition
+let lvt i = map (\j. "lvt.lvtReg_" ^ (int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (lvtLen-1));
+let lvt0 adr = "lvt.lvtReg_" ^ (int2str adr) ^ "<0>";
+let lvt1 adr = "lvt.lvtReg_" ^ (int2str adr) ^ "<1>";
+let lvtiIs lvti n= 
+    let size = length lvti 
+    in
+	letrec tobool n size=
+		(size = 0) => []
+		| (n%2): (tobool (n/2) (size-1)) 
+    in
+	TAndList (map2 (\i.\j. (i=0) => (Is0 (el (j+1) lvti)) | (Is1 (el (j+1) lvti)) ) (tobool n size) (0 upto (size-1)))
+;
+
+//write enable on port K
+let we i = "io_wrEna_"^(int2str i);
+
+let wrEna k =
+    let terms = map (\i. (i=k)=> Is1 ("io_wrEna_" ^ (int2str i)) | Is0 ("io_wrEna_" ^ (int2str i))) (0 upto (m-1)) 
+    in
+    TAndList terms
+;
+
+let nwrEna k =
+    let terms = map (\i. (i=k)=> Is0 ("io_wrEna_" ^ (int2str i)) | Is0 ("io_wrEna_" ^ (int2str i))) (0 upto (m-1)) 
+    in
+    TAndList terms
+;
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//edge 0->1
+let test1 K I adr=
+    //nodes
+    let clk = TAndList [Is0 "CLK", Next (Is1 "CLK")] in
+    let wraddr i = map (\j. "io_wrAddr_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (addr-1)) in //write on write-port i
+    let rdaddr i = map (\j. "io_rdAddr_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (addr-1)) in //read on read-port i
+    let wrdata i = map (\j. "io_wrData_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (width-1)) in
+    let rddata i = map (\j. "io_rdData_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (width-1)) in
+    //symbolic constants
+    let vDataIn = map (\i. bvariable ("data"^(int2str i))) (0 upto (width-1)) in
+    //antecedent
+    let ant_t = TAndList [wrEna K, addrIs (wraddr K) adr, (wrdata K) bvAre vDataIn,  Is0 "reset", clk] in
+    let ant_t1 = TAndList [wrEna K, addrIs (wraddr K) adr,  Is0 "reset", clk] in
+    //consequent
+    let unit kv iv av= Memory kv iv av m n width in
+    let memCheck = TAndList (map (\i. ((unit K i adr) bvAre vDataIn)) (0 upto (n-1))) in 
+    let cons_t1 = Next memCheck in
+    let cons_t2 = Next (lvtiIs (lvt adr) K) in
+    let cons_t = TAndList [Next memCheck, Next (lvtiIs (lvt adr) K)] in
+    let ant = trajForm2FiveTuples ant_t in
+    let cons = trajForm2FiveTuples cons_t in
+    //trace var
+    let tracelist = [("lvt.lvtReg_0<0>", 0, 2), ("lvt.lvtReg_0<1>", 0, 2)] in
+    uSTE "" ckt [] ant cons []  [] => T | F
+   // fseq
+   // let v1 = get_trace_val ckt "lvt.lvtReg_0<0>" 1 in
+   // v1
+;
+//edge 1->1
+let test2 K I adr=
+    //nodes
+    let clk = TAndList [Is0 "CLK", Next (Is1 "CLK")] in
+    let wraddr i = map (\j. "io_wrAddr_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (addr-1)) in //write on write-port i
+    let rdaddr i = map (\j. "io_rdAddr_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (addr-1)) in //read on read-port i
+    let wrdata i = map (\j. "io_wrData_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (width-1)) in
+    let rddata i = map (\j. "io_rdData_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (width-1)) in
+    //symbolic constants
+    let vDataIn = map (\i. bvariable ("dataV"^(int2str i))) (0 upto (width-1)) in
+    let vAddrIn = map (\i. bvariable ("addrV"^(int2str i))) (0 upto (addr-1)) in
+    let vWE = bvariable "wrV" in
+    //memory assertion
+    let unit kv iv av= Memory kv iv av m n width in
+    let memCheck = TAndList (map (\i. ((unit K i adr) bvAre vDataIn)) (0 upto (n-1))) in 
+    //weEnable
+    let ena i = Isb vWE (we i) in
+    let E = TAndList (map (\i. ena i) (0 upto (m-1))) in
+    //wrAddr
+    let addr i = (wraddr i) bvAre vAddrIn in
+    let A = TAndList (map (\i. addr i) (0 upto (m-1))) in
+    //wrEnable and wrAddr
+    let enaAndAddr i = TAndList [Isb vWE (we i), (wraddr i) bvAre vAddrIn] in
+    let EA = TAndList (map (\i. enaAndAddr i) (0 upto (m-1))) in
+    //constraints expression
+    let cnstr_E = bNOT vWE in
+    let cnstr_A = bNOT (isI vAddrIn adr) in
+    let cnstr_EA =  (bNOT vWE) bOR (bNOT (isI vAddrIn adr)) in 
+    //antecedent
+    let ant_t = TAndList [ memCheck, lvtiIs (lvt adr) K,Is0 "reset", EA,  clk] in
+    //consequent
+    let cons_t = TAndList [memCheck, lvtiIs (lvt adr) K] in
+    let ant = trajForm2FiveTuples ant_t in
+    let cons = trajForm2FiveTuples cons_t in
+    uSTE "" ckt [] ant cons []  [cnstr_EA] => T | F
+;
+//edge 1->2
+let test3 K I adr=
+    //nodes
+    let clk = TAndList [Is0 "CLK", Next (Is1 "CLK")] in
+    let wraddr i = map (\j. "io_wrAddr_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (addr-1)) in //write on write-port i
+    let rdaddr i = map (\j. "io_rdAddr_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (addr-1)) in //read on read-port i
+    let wrdata i = map (\j. "io_wrData_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (width-1)) in
+    let rddata i = map (\j. "io_rdData_"^(int2str i) ^ "<" ^ (int2str j) ^ ">") (0 upto (width-1)) in
+    //symbolic constants
+    let vDataIn = map (\i. bvariable ("data"^(int2str i))) (0 upto (width-1)) in
+    //memory assertion
+    let unit kv iv av= Memory kv iv av m n width in
+    let memCheck = TAndList (map (\i. ((unit K i adr) bvAre vDataIn)) (0 upto (n-1))) in 
+    //antecedent
+    let ant_t = TAndList [nwrEna K, memCheck, addrIs (rdaddr I) adr, Next (addrIs (rdaddr I) adr), Is0 "reset", Next (Is0 "reset"), 
+                          lvtiIs (lvt adr) K, Next (lvtiIs (lvt adr) K), clk] in
+    //consequent
+    let cons_t = Next ((rddata I) bvAre vDataIn) in
+    //trace lists
+    let tracelist = [(("lvt.lvtReg_"^(int2str adr) ^ "<1>"), 0, 2)] in
+    let ant = trajForm2FiveTuples ant_t in
+    let cons = trajForm2FiveTuples cons_t in
+    uSTE "" ckt [] ant cons [] [] => T | F
+;
+
+itlist (\i.\r1. 
+    (itlist (\j.\r2.
+        (itlist (\adr.\r3.
+            ((test1 i j adr) AND r3)) 
+        (0 upto (depth-1)) T) AND r2) 
+    (0 upto (n-1)) T) AND r1
+) (0 upto (m-1)) T
+;
+itlist (\i.\r1. 
+    (itlist (\j.\r2.
+        (itlist (\adr.\r3.
+            ((test2 i j adr) AND r3)) 
+        (0 upto (depth-1)) T) AND r2) 
+    (0 upto (n-1)) T) AND r1
+) (0 upto (m-1)) T
+;
+itlist (\i.\r1. 
+    (itlist (\j.\r2.
+        (itlist (\adr.\r3.
+            ((test3 i j adr) AND r3)) 
+        (0 upto (depth-1)) T) AND r2) 
+    (0 upto (n-1)) T) AND r1
+) (0 upto (m-1)) T
+;
+quit;
