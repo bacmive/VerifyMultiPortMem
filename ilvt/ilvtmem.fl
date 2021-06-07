@@ -186,7 +186,7 @@ let muxrAssert k adr =
 //test all (M-1) feedback write blocks and all (N) read blocks related to write-port K
 let test1 K adr =
     let wconsAssert = TAndList (map (\j. (memwUnit K j adr) bvAre vDataIn) (0 upto (M-2))) in
-    let rconsAssert = TAndList (map (\j. (memrUnit K j adr) bvAre vDataIn) (0 upto (M-2))) in
+    let rconsAssert = TAndList (map (\j. (memrUnit K j adr) bvAre vDataIn) (0 upto (N-1))) in
     //antecedent and consequent
     let ant_t = TAndList [memwAntAssertNoK K adr, Next (memwAntAssertNoK K adr), Next (Next (memwAntAssertNoK K adr)),
                         memrAntAssertNoK K adr, Next (memrAntAssertNoK K adr), Next (Next (memrAntAssertNoK K adr)),

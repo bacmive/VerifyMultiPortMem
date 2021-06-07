@@ -148,7 +148,7 @@ let test2 K I adr=
     //antecedent
     let ant_t = TAndList [ memCheck, lvtiIs (lvt adr) K,Is0 "reset", EA,  clk] in
     //consequent
-    let cons_t = TAndList [memCheck, lvtiIs (lvt adr) K] in
+    let cons_t = Next (TAndList [memCheck, lvtiIs (lvt adr) K]) in
     let ant = trajForm2FiveTuples ant_t in
     let cons = trajForm2FiveTuples cons_t in
     uSTE "" ckt [] ant cons []  [cnstr_EA] => T | F
