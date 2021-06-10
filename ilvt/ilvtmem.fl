@@ -1,4 +1,4 @@
-let ckt = load_exe "OneHotCodeILvtMultiPortMemory32.exe";
+let ckt = load_exe "OneHotCodeILvtMultiPortMemory16.exe";
 load "gsteSymReduce.fl";
 loadModel ckt;
 
@@ -30,7 +30,7 @@ let uSTE option model weak ant cons trace_list constraints =
     )
 ;
 
-let M = 3;          //write port number
+let M = 2;          //write port number
 let N = 2;          //read port number
 let Addr = 4;       //address size
 let Depth = 2**4;   //memory depth
@@ -186,7 +186,7 @@ let muxrAssert k adr =
 //test all (M-1) feedback write blocks and all (N) read blocks related to write-port K
 let test1 K adr =
     let wconsAssert = TAndList (map (\j. (memwUnit K j adr) bvAre vDataIn) (0 upto (M-2))) in
-    let rconsAssert = TAndList (map (\j. (memrUnit K j adr) bvAre vDataIn) (0 upto (N-1))) in
+    let rconsAssert = TAndList (map (\j. (memrUnit K j adr) bvAre vDataIn) (0 upto (M-2))) in
     //antecedent and consequent
     let ant_t = TAndList [memwAntAssertNoK K adr, Next (memwAntAssertNoK K adr), Next (Next (memwAntAssertNoK K adr)),
                         memrAntAssertNoK K adr, Next (memrAntAssertNoK K adr), Next (Next (memrAntAssertNoK K adr)),
@@ -265,7 +265,7 @@ let test3 K R adr =
     //constraints
     let rcellValAti i = (i<K => bNOT (muxrCellV i adr (K-1)) | (muxrCellV (i+1) adr K)) in
     let cnstr = map (\i. bEqual (muxrCellV K adr i) (rcellValAti i)) (0 upto (M-2)) in
-    let cnstr1 = map (\i. bEqual (muxrCellV K adr i) bF ) (0 upto (M-2)) in
+    let cnstr1 = map (\i. bEqual (muxrCellV K adr i) bT ) (0 upto (M-2)) in
     //antecedent and consequent
     let ant_t = TAndList [memrAntAssert, Next (memrAntAssert), 
                         muxrAntAssert, Next (muxrAntAssert),
@@ -279,26 +279,26 @@ let test3 K R adr =
     uSTE "" ckt [] ant cons [] (cnstr@cnstr1) => T | F 
 ;
 
-itlist (\i.\r1. 
-        (itlist (\j.\r2. 
-                (test1 i j) AND r2)  
-            (0 upto (Depth-1)) T ) AND r1)
-        (0 upto (M-1)) T
-;
+  itlist (\i.\r1. 
+          (itlist (\j.\r2. 
+                  (test1 i j) AND r2)  
+              (0 upto (Depth-1)) T ) AND r1)
+          (0 upto (M-1)) T
+  ;
 
-itlist (\i.\r1. 
-        (itlist (\j.\r2. 
-                (test2 i j) AND r2)  
-            (0 upto (Depth-1)) T ) AND r1)
-        (0 upto (M-1)) T
-;
+  itlist (\i.\r1. 
+          (itlist (\j.\r2. 
+                  (test2 i j) AND r2)  
+              (0 upto (Depth-1)) T ) AND r1)
+          (0 upto (M-1)) T
+  ;
 
-itlist (\i.\r1. 
-        (itlist (\j.\r2. 
-                      (itlist (\a.\r3.
-                          (test3 i j a) AND r3)
-                  (0 upto (Depth-1)) T) AND r2)
-            (0 upto (N-1)) T ))
-        (0 upto (M-1)) T
-;
+  itlist (\i.\r1. 
+          (itlist (\j.\r2. 
+                        (itlist (\a.\r3.
+                            (test3 i j a) AND r3)
+                    (0 upto (Depth-1)) T) AND r2)
+              (0 upto (N-1)) T ))
+          (0 upto (M-1)) T
+  ;
 quit;

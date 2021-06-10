@@ -1,8 +1,8 @@
-let ckt = load_exe "OneHotCodeILvtMultiPortMemory32.exe";
+let ckt = load_exe "OneHotCodeILvtMultiPortMemory16.exe";
 load "trajEval.fl";
 load "tools.fl";
 
-let M = 3;          //write port number
+let M = 2;          //write port number
 let N = 2;          //read port number
 let Addr = 4;       //address size
 let Depth = 2**4;   //memory depth
