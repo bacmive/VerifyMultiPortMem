@@ -1,7 +1,7 @@
 update_vossrc "DYNAMIC-ORDERING" "FALSE";
 let ckt = load_exe "XORMultiPortMemory16.exe";
-load "trajEval.fl";
-load "tools.fl";
+load "../trajEval.fl";
+load "../tools.fl";
 
 let M = 2;          //write port number
 let N = 2;          //read port number

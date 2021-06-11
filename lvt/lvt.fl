@@ -1,6 +1,6 @@
 let ckt = load_exe "LVTMultiPortRams16.exe";
-load "trajEval.fl";
-load "tools.fl";
+load "../trajEval.fl";
+load "../tools.fl";
 
 let m = 2;      //write port number
 let n = 2;      //read port number
